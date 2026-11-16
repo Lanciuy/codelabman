@@ -23,6 +23,14 @@ export default function LoginScreen() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(`${title}\n\n${message}`);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
   // 1.3 CORE AUTHENTICATION ENGINE (CODELAB 3 CHALLENGE)
   const handleAuth = async () => {
     // 2.1 SANITIZE INPUTS & VALIDATION
@@ -31,52 +39,85 @@ export default function LoginScreen() {
     const cleanCallsign = callsign.trim();
 
     if (!cleanEmail || !cleanPassword) {
-      Alert.alert('Hold on, Operative!', 'Please provide both an email and password to proceed.');
+      showAlert('Hold on, Operative!', 'Please provide both an email and password to proceed.');
       return;
     }
 
     if (isRegistering && !cleanCallsign) {
-      Alert.alert('Identity Missing', 'Every operative in the field needs a tactical callsign!');
+      showAlert('Identity Missing', 'Every operative in the field needs a tactical callsign!');
       return;
     }
 
     setLoading(true);
+    const authTimeoutMs = 12000;
+    const withAuthTimeout = <T,>(promise: Promise<T>): Promise<T> =>
+      new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          const timeoutErr = new Error('Request timed out (12s). Check internet connection or reload Metro.');
+          timeoutErr.name = 'AbortError';
+          reject(timeoutErr);
+        }, authTimeoutMs);
+
+        promise.then(
+          (val) => {
+            clearTimeout(timer);
+            resolve(val);
+          },
+          (err) => {
+            clearTimeout(timer);
+            reject(err);
+          }
+        );
+      });
+
     try {
       if (isRegistering) {
+        console.log('[Auth] Starting signUp for:', cleanEmail);
         // 2.2 SIGN UP: RECRUIT NEW OPERATIVE (WITH METADATA)
-        const { error } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: cleanPassword,
-          options: {
-            data: {
-              callsign: cleanCallsign,
-              role: 'hero',
+        const { error } = await withAuthTimeout(
+          supabase.auth.signUp({
+            email: cleanEmail,
+            password: cleanPassword,
+            options: {
+              data: {
+                callsign: cleanCallsign,
+                role: 'hero',
+              },
             },
-          },
-        });
+          })
+        );
 
+        console.log('[Auth] signUp finished, error:', error?.message || 'none');
         if (error) {
-          Alert.alert('Recruitment Denied', error.message);
+          showAlert('Recruitment Denied', error.message);
         } else {
-          Alert.alert('Enlistment Successful!', 'Credentials registered. Switch to Sign In to enter HQ!');
+          showAlert('Enlistment Successful!', 'Credentials registered. Switch to Sign In to enter HQ!');
           setIsRegistering(false);
           setPassword('');
         }
       } else {
+        console.log('[Auth] Starting signIn for:', cleanEmail);
         // 2.3 SIGN IN: AUTHENTICATE RETURNING HERO
-        const { error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: cleanPassword,
-        });
+        const { error } = await withAuthTimeout(
+          supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: cleanPassword,
+          })
+        );
 
+        console.log('[Auth] signIn finished, error:', error?.message || 'none');
         if (error) {
-          Alert.alert('Access Denied', error.message);
+          showAlert('Access Denied', error.message);
         } else {
           router.replace('/');
         }
       }
     } catch (err: any) {
-      Alert.alert('System Malfunction', 'Unable to establish communication with HQ.');
+      const msg =
+        err?.name === 'AbortError'
+          ? 'Connection timed out. Check your phone internet/Wi-Fi connection and try again.'
+          : err?.message || 'Unable to establish communication with HQ.';
+      showAlert('System Malfunction', msg);
       console.error('Auth Exception:', err);
     } finally {
       setLoading(false);

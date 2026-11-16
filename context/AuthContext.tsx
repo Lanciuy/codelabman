@@ -22,11 +22,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // 2.1 Rehydrate existing session from Hardware Vault on app startup
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
 
     // 2.2 Listen to real-time Auth events (LOGIN, LOGOUT, TOKEN_REFRESH)
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
