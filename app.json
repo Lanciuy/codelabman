@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "mobile-modul4",
+    "slug": "mobile-modul4",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "mobilemodul4",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
